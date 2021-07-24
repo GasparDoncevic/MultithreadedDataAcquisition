@@ -1,7 +1,7 @@
-# dataAcquisitionAndPlottingMultithreading
+# MultithreadedDataAcquisition
 A python script used for reading data from a virtual COM port, store the data to a .txt file and plot selected data using the matplotlib library.
 
-The data recieved is in the form of a 4 byte float, which is sent at a baud rate of 921600.
+The data recieved is in the form of a 4 byte `float`, which is sent at a baud rate of 921600.
 In order to allow larger quantities of data to be recieved, multithreading was implemented, which is sufficient for lower sample rates.
 The ammount of plotted data each second can be adjusted.
 
