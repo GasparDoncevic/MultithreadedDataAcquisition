@@ -7,5 +7,5 @@ The ammount of plotted data each second can be adjusted.
 
 Overstressing this code with too much data on the reciever buffer of the virtual COM port will lead to delays in plotting and unpacking data, and possibly loss of data.
 
-Future plans:
-  -implementing multiprocessing, which will allow for greater processing power to be distributed to each logical task the script performs 
+Future plans:  
+- implementing multiprocessing, which will allow for greater processing power to be distributed to each logical task the script performs 
