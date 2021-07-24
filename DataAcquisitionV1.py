@@ -8,16 +8,6 @@ import sys
 from matplotlib import pyplot as plt
 
 
-""" def mockInitSerialPort(portName: str, baudRate: int = 921600):
-    return Serial()
-
-def mockReceiveData(mockSerial: Serial, storageQueue: multiprocessing.Queue, displayQueue: multiprocessing.Queue, stopped: threading.Event):
-    while not stopped.is_set():
-        time.sleep(0.000045)
-        randValue = random.random() * 3.3
-        storageQueue.put_nowait(randValue)
-        displayQueue.put_nowait(randValue) """
-
 def initSerialPort(portName: str, baudRate: int = 921600):
     ser = Serial()
     ser.baudrate = baudRate
@@ -30,22 +20,30 @@ def initSerialPort(portName: str, baudRate: int = 921600):
 def receiveData(mockSerial: Serial, storageQueue: multiprocessing.Queue, displayQueue: multiprocessing.Queue, stopped: threading.Event):
     dataUnitCount = 0
     while not stopped.is_set():
+        DEGUBSTARTREADTIME = 0
+        DEBUGSTOPREADTIME = 0
         syncByte = serialPort.read(1)
         if(syncByte == b'\xff' ):
+            DEGUBSTARTREADTIME = time.time_ns()
             bytedMeas = bytearray(4)
             bytedMeas = serialPort.read(4)
-            floatData: float = struct.unpack('<f', bytedMeas)
-            dataUnitCount += 1
-            storageQueue.put_nowait(floatData)
-            if dataUnitCount >= 367:
-                displayQueue.put_nowait(floatData)
-                dataUnitCount = 0
+            floatData = struct.unpack('<f', bytedMeas)[0]
+            DEBUGSTOPREADTIME = time.time_ns()  
+            if ((floatData > 0.0) and (floatData < 3.3)):
+                dataUnitCount += 1
+                storageQueue.put(floatData)
+                if dataUnitCount >= 350:
+                    displayQueue.put(floatData)
+                    #print(displayQueue.qsize())
+                    dataUnitCount = 0
+             
+        print((DEGUBSTARTREADTIME - DEBUGSTOPREADTIME)/1000)
 
 def storeData(queue: multiprocessing.Queue, stopped: threading.Event):
     while not stopped.is_set():
         with open("output.txt", "a") as file:
             dataUnitsStored = 0
-            while dataUnitsStored < 22000:
+            while dataUnitsStored < 22000 and not stopped.is_set():
                 if not queue.empty():
                     data = queue.get_nowait() # blocks the thread until item is available
                     file.write(str(data) + "\n")
@@ -60,13 +58,19 @@ def plotData(queue: multiprocessing.Queue):
         dataY.append(newReading)
         dataTime = time.time_ns()
         dataX.append((dataTime-startTime)/1000000000)
-        plt.plot(dataX, dataY)
-        plt.pause(0.01)
+        
         plt.xlim(0, 200)
         plt.ylim(bottom=0, top=3.5)
         plt.xlabel("Time")
         plt.ylabel("Voltage")
+        plt.plot(dataX, dataY)
+        plt.pause(0.01)
         plt.cla()
+
+        if (dataTime-startTime)/1000000000 >= 200:
+            startTime = time.time_ns()
+            dataX.clear()
+            dataY.clear()
         
 
 if __name__ == "__main__":
@@ -74,11 +78,11 @@ if __name__ == "__main__":
     displayQueue = multiprocessing.Queue()
 
     stopped = threading.Event()
-    with initSerialPort("COM5") as serialPort:
+    with initSerialPort("COM3") as serialPort:
         storingData = threading.Thread(target=storeData, args=(storageQueue, stopped, ))
         receivingData = threading.Thread(target=receiveData, args=(serialPort, storageQueue, displayQueue, stopped, ))
 
-
+        ctrlcStop = False
         storingData.start()
         receivingData.start()  
         try:
@@ -86,11 +90,16 @@ if __name__ == "__main__":
         except KeyboardInterrupt: #Capture Ctrl-C
             print ("Captured Ctrl-C")
             stopped.set()
-        stopped.set()
-        storingData.join()
-        receivingData.join()
-
-
+            plt.close()
+            ctrlcStop = True
+        
+        if not ctrlcStop:
+            stopped.set()
+            storingData.join()
+            receivingData.join()
+            plt.close()
+    storageQueue.close()
+    displayQueue.close()
 
 
 
